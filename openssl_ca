@@ -1,0 +1,167 @@
+#!/bin/bash
+
+#  This script creates two pairs of certificate/private key
+# to stablish a CA for development porpouse.
+#
+#  It's based on the contents of the page
+#    https://jamielinux.com/docs/openssl-certificate-authority/index.html
+# with minor modifications in the proposed directory structure.
+
+#############
+# constants #
+#############
+
+tarfile="config.tar.gz"
+
+root_config="openssl_root.cnf"
+root_dir="rootCA"
+root_basename="root"
+
+intermediate_config="openssl_intermediate.cnf"
+intermediate_dir="intermediateCA"
+intermediate_basename="intermediate"
+
+third_party_dir="others"
+
+#############
+# functions #
+#############
+function usage {
+    #    echo "Usage: openssl_ca [ ca | server | sign CSR_FILE | export ID]"
+        echo "Usage: openssl_ca [ ca | server | sign CSR_FILE ]"
+    exit 1
+}
+
+function fail {
+    echo "$1"
+    exit 2
+}
+
+function untar {
+    if [[ -f $tarfile ]];
+    then
+	if [[ -d $config_file ]];
+	then	    	       
+	    echo "INFO:: directory $config_file already exist"
+	else	    	   
+	    tar xf $tarfile
+	fi	
+    else
+	fail "Tarfile ($tarfile) not found"
+    fi    
+}
+
+function create_structure {
+    mkdir -p "$1/certs" "$1/crl" "$1/newcerts" "$1/private" "$1/csr"
+    chmod 700 "$1/private"
+    touch "$1/index.txt"
+    echo "1000" > "$1/serial"
+}
+
+function check_dir {
+    if [[ ! -d $1 ]];      
+    then	
+	mkdir -p $1	
+    fi    
+}
+
+function create_key {
+    if [[ -f "$1/private/$2_private.key.pem" ]];
+    then      
+	echo "INFO::$1/private/$2_private.key.pem already exist"
+    else
+	check_dir "$1/private"
+	   
+	openssl genrsa -aes256 -out "$1/private/$2_private.key.pem" $3
+	chmod 400 "$1/private/$2_private.key.pem"
+    fi
+}
+
+function create_ca_cer {
+    if [[ -f "$1/certs/public.cer.pem" ]];       
+    then      
+	echo "INFO::$1/certs/public.cer.pem already exist"
+    else	
+	openssl req -config "$2" -key "$1/private/$(echo $root_basename)_private.key.pem" -new -x509 -days 7300 -sha256 -extensions v3_ca -out "$1/certs/$(echo $root_basename)_public.cer.pem"
+    fi    
+	
+}
+
+function create_csr {
+    if [[ -f "$1/csr/$2_public.csr.pem" ]];
+    then
+	echo "INFO::$1/csr/$2_public.csr.pem already exist"
+    else
+	check_dir "$1/csr"
+	
+	openssl req -config $3 -new -sha256 -key "$1/private/$(echo $2)_private.key.pem" -out "$1/csr/$(echo $2)_public.csr.pem"
+    fi    
+}
+
+function sign {
+    if [[ -f "$2" ]];
+    then
+	echo "INFO::$2 already exist"
+    else
+	check_dir $2
+	
+	openssl ca -config $4 -extensions $5 -days $6 -notext -md sha256 -in $1 -out $2/$3
+    fi    
+}
+
+function create_chain {
+    cat $2 $3 > $1
+}
+
+#############
+
+
+
+
+if [[ $# < 1 ]];
+then    
+    usage    
+fi
+
+option=$1
+
+if [[ "$option" == "ca" ]];
+then
+    echo "Creating root and intermediate certificates"
+    untar
+    echo "Creating root CA directory structure"
+    create_structure $root_dir
+    create_key $root_dir $root_basename 4096
+    create_ca_cer $root_dir config/$root_config
+
+    echo "Creating intermediate CA directory structure"
+    create_structure $intermediate_dir
+    create_key $intermediate_dir $intermediate_basename 4096
+    create_csr $intermediate_dir $intermediate_basename config/$intermediate_config
+    sign $intermediate_dir/csr/$(echo $intermediate_basename)_public.csr.pem $intermediate_dir/certs/ $(echo $intermediate_basename)_public.cer.pem config/$root_config "v3_intermediate_ca" 3650
+    create_chain "$intermediate_dir/certs/chain.cer.pem" "$intermediate_dir/certs/$(echo $intermediate_basename)_public.cer.pem" "$root_dir/certs/$(echo $root_basename)_public.cer.pem"
+    
+elif [[ "$option" == "server" ]];
+then
+    echo "Creating key and CSR for a thirh party"
+    index=$RANDOM
+    create_key $third_party_dir $index 2048
+    create_csr $third_party_dir $index config/$intermediate_config
+    sign $third_party_dir/csr/$(echo $index)_public.csr.pem $third_party_dir/certs/ $(echo $index)_public.cer.pem config/$intermediate_config "usr_cert" 365
+    create_chain $third_party_dir/certs/$(echo $index)_chain.pem $third_party_dir/certs/$(echo $index)_public.cer.pem $intermediate_dir/certs/chain.cer.pem
+    echo "Generated ID $index"
+elif [[ "$option" == "sign" ]];
+then
+    echo "Signing certificate"
+    sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config "usr_cert" 365
+    
+#elif [[ "$option" == "export" ]];
+#then
+#    echo "Exporting"
+#    mkdir exported
+#    cp --parents $third_party_dir/certs/$( 
+else
+    fail "Unknown command"
+fi
+
+exit 0
