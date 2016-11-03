@@ -1,11 +1,6 @@
 #!/bin/bash
 
-#  This script creates two pairs of certificate/private key
-# to stablish a CA for development porpouse.
-#
-#  It's based on the contents of the page
-#    https://jamielinux.com/docs/openssl-certificate-authority/index.html
-# with minor modifications in the proposed directory structure.
+#This script is released under GPLv2
 
 #############
 # constants #
@@ -27,8 +22,7 @@ third_party_dir="others"
 # functions #
 #############
 function usage {
-    #    echo "Usage: openssl_ca [ ca | server | sign CSR_FILE | export ID]"
-        echo "Usage: openssl_ca [ ca | server | sign CSR_FILE ]"
+    echo "Usage: openssl_ca [ ca | server | client | sign CSR_FILE | export ID]"    
     exit 1
 }
 
@@ -131,13 +125,18 @@ then
     untar
     echo "Creating root CA directory structure"
     create_structure $root_dir
+    echo "Creating root CA key"
     create_key $root_dir $root_basename 4096
+    echo "Creating root CA certificate"
     create_ca_cer $root_dir config/$root_config
 
     echo "Creating intermediate CA directory structure"
     create_structure $intermediate_dir
+    echo "Creating intermediate CA key"
     create_key $intermediate_dir $intermediate_basename 4096
+    echo "Creating intermediate CA CSR file"    
     create_csr $intermediate_dir $intermediate_basename config/$intermediate_config
+    echo "Creating intermediate CA signed certificate"    
     sign $intermediate_dir/csr/$(echo $intermediate_basename)_public.csr.pem $intermediate_dir/certs/ $(echo $intermediate_basename)_public.cer.pem config/$root_config "v3_intermediate_ca" 3650
     create_chain "$intermediate_dir/certs/chain.cer.pem" "$intermediate_dir/certs/$(echo $intermediate_basename)_public.cer.pem" "$root_dir/certs/$(echo $root_basename)_public.cer.pem"
     
@@ -145,9 +144,26 @@ elif [[ "$option" == "server" ]];
 then
     echo "Creating key and CSR for a thirh party"
     index=$RANDOM
+    echo "Creating key"
     create_key $third_party_dir $index 2048
+    echo "Creating CSR file"    
     create_csr $third_party_dir $index config/$intermediate_config
+    echo "Creating certificate"    
+    sign $third_party_dir/csr/$(echo $index)_public.csr.pem $third_party_dir/certs/ $(echo $index)_public.cer.pem config/$intermediate_config "server_cert" 365
+    echo "Creating chained certificate"    
+    create_chain $third_party_dir/certs/$(echo $index)_chain.pem $third_party_dir/certs/$(echo $index)_public.cer.pem $intermediate_dir/certs/chain.cer.pem
+    echo "Generated ID $index"
+elif [[ "$option" == "client" ]];     
+then
+    echo "Creating key and CSR for a thirh party"
+    index=$RANDOM
+    echo "Creating key"
+    create_key $third_party_dir $index 2048
+    echo "Creating CSR file"    
+    create_csr $third_party_dir $index config/$intermediate_config
+    echo "Creating certificate"    
     sign $third_party_dir/csr/$(echo $index)_public.csr.pem $third_party_dir/certs/ $(echo $index)_public.cer.pem config/$intermediate_config "usr_cert" 365
+    echo "Creating chained certificate"    
     create_chain $third_party_dir/certs/$(echo $index)_chain.pem $third_party_dir/certs/$(echo $index)_public.cer.pem $intermediate_dir/certs/chain.cer.pem
     echo "Generated ID $index"
 elif [[ "$option" == "sign" ]];
@@ -155,11 +171,13 @@ then
     echo "Signing certificate"
     sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config "usr_cert" 365
     
-#elif [[ "$option" == "export" ]];
-#then
-#    echo "Exporting"
-#    mkdir exported
-#    cp --parents $third_party_dir/certs/$( 
+elif [[ "$option" == "export" ]];
+then
+    echo "Exporting"
+    mkdir exported
+    find  -regex ".*$2.*" | xargs -I {} cp {} exported/
+    tar czf $(echo $2)_exported.tar.gz exported/
+    rm -r exported
 else
     fail "Unknown command"
 fi

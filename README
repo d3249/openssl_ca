@@ -1,0 +1,7 @@
+This script is released unde GPLv2 licence. You can find it in the LICENCE file.
+
+This script is intended to be used to quikly create a Certificate Authority (CA) for developing and/or testing porpuses.
+
+The script mainly follows the steps by Jamie Nguyen in its page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
+
+There are three commands
