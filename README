@@ -1,7 +1,17 @@
-This script is released unde GPLv2 licence. You can find it in the LICENCE file.
+This project is released under GPLv2 licence. You can find it in the LICENCE file.
 
-This script is intended to be used to quikly create a Certificate Authority (CA) for developing and/or testing porpuses.
+The proyect is currently conformed by two scripts and a compressed file with two configuration files.
 
-The script mainly follows the steps by Jamie Nguyen in its page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
+This project is intended to be used to quikly create a Certificate Authority (CA) for developing and/or testing porpuses.
 
-There are three commands
+The script openssl_ca mainly follows the steps by Jamie Nguyen in its page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
+
+There are five commands for the openssl_ca script:
+      ca - Will create root and intermediate CA certificates and the corresponding keys.
+      server - Will create a key, a crs file and the corresponding certificate signed by intermediate CA. The certificate will be allowed for server authenticaton.
+      client - Will create a key, a crs file and the corresponding certificate signed by intermediate CA. The certificate will be allowed for client authenticaton.
+      sign [ server | client ] - Will respond to a CSR generating a certificate signed by intermediate CA with given permissions.
+      export ID - Will create a compressed file with all files corresponding to the given id.
+
+The second script converts the PEM files to a single JKS keystore file.
+      

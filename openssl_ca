@@ -22,7 +22,7 @@ third_party_dir="others"
 # functions #
 #############
 function usage {
-    echo "Usage: openssl_ca [ ca | server | client | sign CSR_FILE | export ID]"    
+    echo "Usage: openssl_ca [ ca | server | client | sign CSR_FILE [ server | client ] | export ID]"    
     exit 1
 }
 
@@ -168,8 +168,18 @@ then
     echo "Generated ID $index"
 elif [[ "$option" == "sign" ]];
 then
+    if [[ "$3" == "server" ]];
+    then
+	permission="server_cert"
+    elif [[ "$3" == "client" ]];
+    then
+	permission="usr_cert"
+    else
+	fail "Unknown sign option"
+    fi
+    	 
     echo "Signing certificate"
-    sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config "usr_cert" 365
+    sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config $permission 365
     
 elif [[ "$option" == "export" ]];
 then
