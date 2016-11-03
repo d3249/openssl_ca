@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [[ $# != 4 ]];
+then    
+    echo "Usage: pem2jks CERT_FILE KEY_FILE ALIAS JKS_FILE"
+    exit 1
+fi
+
+cerfile=$1
+keyfile=$2
+alias=$3
+outfile=$4
+
+openssl pkcs12 -export -inkey $keyfile -in $cerfile -name $alias -out tmp.p12
+
+keytool -importkeystore -srckeystore tmp.p12 -srcstoretype PKCS12 -destkeystore $outfile -deststoretype JKS
+
+rm tmp.p12
+
+exit 0
