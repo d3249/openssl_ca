@@ -4,7 +4,7 @@ The proyect is currently conformed by two scripts and a compressed file with two
 
 This project is intended to be used to quikly create a Certificate Authority (CA) for developing and/or testing porpuses.
 
-The script openssl_ca mainly follows the steps by Jamie Nguyen in its page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
+The script openssl_ca mainly follows the steps by Jamie Nguyen in his page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
 
 There are five commands for the openssl_ca script:
       ca - Will create root and intermediate CA certificates and the corresponding keys.
@@ -14,4 +14,10 @@ There are five commands for the openssl_ca script:
       export ID - Will create a compressed file with all files corresponding to the given id.
 
 The second script converts the PEM files to a single JKS keystore file.
-      
+
+    pem2jks CERT_FILE KEY_FILE ALIAS OUT_FILE
+
+    CERT_FILE - The certificate file to export
+    KEY_FILE - The correspondign key
+    ALIAS - Alias for the entry
+    OUT_FILE - Name of the output file
