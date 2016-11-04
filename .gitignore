@@ -3,4 +3,6 @@
 rootCA/
 intermediateCA/
 config/
-other/
+others/
+exported/
+*exported.tar.gz
