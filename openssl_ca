@@ -17,13 +17,21 @@
 
 tarfile="config.tar.gz"
 
-root_config="openssl_root.cnf"
-root_dir="rootCA"
-root_basename="root"
+if [[ -d config ]];
+then
+    
+    root_config="openssl_root.cnf"
+    root_dir=`grep -E "(^dir)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|'`
+    root_key=`grep -E "(^private_key)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $root_dir)'|'`
+    root_cer=`grep -E "(^certificate)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $root_dir)'|'`
+    root_basename="root"
 
-intermediate_config="openssl_intermediate.cnf"
-intermediate_dir="intermediateCA"
-intermediate_basename="intermediate"
+    intermediate_config="openssl_intermediate.cnf"
+    intermediate_dir=`grep -E "(^dir)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|'`
+    intermediate_key=`grep -E "(^private_key)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $intermediate_dir)'|'`
+    intermediate_cer=`grep -E "(^certificate)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $intermediate_dir)'|'`
+    intermediate_basename="intermediate"
+fi
 
 third_party_dir="others"
 
@@ -85,7 +93,7 @@ function create_ca_cer {
     then      
 	echo "INFO::$1/certs/public.cer.pem already exist"
     else	
-	openssl req -config "$2" -key "$1/private/$(echo $root_basename)_private.key.pem" -new -x509 -days 7300 -sha256 -extensions v3_ca -out "$1/certs/$(echo $root_basename)_public.cer.pem"
+	openssl req -config "$2" -key "$root_key" -new -x509 -days 7300 -sha256 -extensions v3_ca -out "$root_cer"	
     fi    
 	
 }
@@ -131,7 +139,6 @@ option=$1
 if [[ "$option" == "ca" ]];
 then
     echo "Creating root and intermediate certificates"
-    untar
     echo "Creating root CA directory structure"
     create_structure $root_dir
     echo "Creating root CA key"
@@ -148,7 +155,10 @@ then
     echo "Creating intermediate CA signed certificate"    
     sign $intermediate_dir/csr/$(echo $intermediate_basename)_public.csr.pem $intermediate_dir/certs/ $(echo $intermediate_basename)_public.cer.pem config/$root_config "v3_intermediate_ca" 3650
     create_chain "$intermediate_dir/certs/chain.cer.pem" "$intermediate_dir/certs/$(echo $intermediate_basename)_public.cer.pem" "$root_dir/certs/$(echo $root_basename)_public.cer.pem"
-    
+elif [[ "$option" == "prepare" ]];
+then
+    echo "Extractig configuration files"
+    untar        
 elif [[ "$option" == "server" ]];
 then
     echo "Creating key and CSR for a thirh party"

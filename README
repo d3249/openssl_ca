@@ -7,6 +7,7 @@ This project is intended to be used to quikly create a Certificate Authority (CA
 The script openssl_ca mainly follows the steps by Jamie Nguyen in his page (https://jamielinux.com/docs/openssl-certificate-authority/index.html) with minor changes in directory structure.
 
 There are five commands for the openssl_ca script:
+      prepare - Will extract configuration files in config/ directory
       ca - Will create root and intermediate CA certificates and the corresponding keys.
       server - Will create a key, a crs file and the corresponding certificate signed by intermediate CA. The certificate will be allowed for server authenticaton.
       client - Will create a key, a crs file and the corresponding certificate signed by intermediate CA. The certificate will be allowed for client authenticaton.
