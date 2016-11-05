@@ -194,7 +194,8 @@ elif [[ "$option" == "export" ]];
 then
     echo "Exporting"
     mkdir exported
-    find  -regex ".*$2.*[cer|key]\.pem$" | xargs -I {} cp {} exported/
+    find -regextype posix-egrep -regex ".*$2.*(cer|key)\.pem$" | xargs -I {} cp {} exported/
+    ls exported/*.pem | xargs -n 1 chmod 650 
     tar czf $(echo $2)_exported.tar.gz exported/
     rm -r exported
 else
