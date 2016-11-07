@@ -21,10 +21,12 @@ keyfile=$2
 alias=$3
 outfile=$4
 
-openssl pkcs12 -export -inkey $keyfile -in $cerfile -name $alias -out tmp.p12
+tmp_file="tmp.p12"
 
-keytool -importkeystore -srckeystore tmp.p12 -srcstoretype PKCS12 -destkeystore $outfile -deststoretype JKS
+openssl pkcs12 -export -inkey $keyfile -in $cerfile -name $alias -out "$tmp_file"
 
-rm tmp.p12
+keytool -importkeystore -srckeystore "$tmp_file" -srcstoretype PKCS12 -destkeystore $outfile -deststoretype JKS
+
+rm "$tmp_file"
 
 exit 0
