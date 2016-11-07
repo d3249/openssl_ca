@@ -17,29 +17,40 @@
 
 tarfile="config.tar.gz"
 
-if [[ -d config ]];
+config_file="config"
+
+root_config="openssl_root.cnf"
+root_basename="root"
+
+intermediate_config="openssl_intermediate.cnf"
+intermediate_basename="intermediate"
+
+third_party_dir="others"
+
+ca_keysize=4096
+others_keysize=2048
+
+root_ca_validity=7300 #days
+intermediate_ca_validity=3650 #days
+others_validity=365 #days
+
+if [[ -d "$config_file" ]];
 then
     
-    root_config="openssl_root.cnf"
     root_dir=`grep -E "(^dir)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|'`
     root_key=`grep -E "(^private_key)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $root_dir)'|'`
     root_cer=`grep -E "(^certificate)" config/$root_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $root_dir)'|'`
-    root_basename="root"
 
-    intermediate_config="openssl_intermediate.cnf"
     intermediate_dir=`grep -E "(^dir)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|'`
     intermediate_key=`grep -E "(^private_key)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $intermediate_dir)'|'`
     intermediate_cer=`grep -E "(^certificate)" config/$intermediate_config | sed -r -e 's|^.*=\s*(.*)|\1|' -e 's|\\$dir|'\$(echo $intermediate_dir)'|'`
-    intermediate_basename="intermediate"
 fi
-
-third_party_dir="others"
 
 #############
 # functions #
 #############
 function usage {
-    echo "Usage: openssl_ca [ ca | server | client | sign CSR_FILE [ server | client ] | export ID]"    
+    echo "Usage: openssl_ca [ prepare | ca | server | client | sign CSR_FILE [ server | client ] | export ID]"    
     exit 1
 }
 
@@ -93,7 +104,7 @@ function create_ca_cer {
     then      
 	echo "INFO::$1/certs/public.cer.pem already exist"
     else	
-	openssl req -config "$2" -key "$root_key" -new -x509 -days 7300 -sha256 -extensions v3_ca -out "$root_cer"	
+	openssl req -config "$2" -key "$root_key" -new -x509 -days $root_ca_validity -sha256 -extensions v3_ca -out "$root_cer"	
     fi    
 	
 }
@@ -124,6 +135,13 @@ function create_chain {
     cat $2 $3 > $1
 }
 
+function check_config {
+    if [[ ! -d "$config_file" ]];
+    then
+	fail "No $config_file directory found"
+    fi    
+}
+
 #############
 
 
@@ -138,22 +156,25 @@ option=$1
 
 if [[ "$option" == "ca" ]];
 then
+
+    check_config
+    
     echo "Creating root and intermediate certificates"
     echo "Creating root CA directory structure"
     create_structure $root_dir
     echo "Creating root CA key"
-    create_key $root_dir $root_basename 4096
+    create_key $root_dir $root_basename $ca_keysiza
     echo "Creating root CA certificate"
     create_ca_cer $root_dir config/$root_config
 
     echo "Creating intermediate CA directory structure"
     create_structure $intermediate_dir
     echo "Creating intermediate CA key"
-    create_key $intermediate_dir $intermediate_basename 4096
+    create_key $intermediate_dir $intermediate_basename $ca_keysize
     echo "Creating intermediate CA CSR file"    
     create_csr $intermediate_dir $intermediate_basename config/$intermediate_config
     echo "Creating intermediate CA signed certificate"    
-    sign $intermediate_dir/csr/$(echo $intermediate_basename)_public.csr.pem $intermediate_dir/certs/ $(echo $intermediate_basename)_public.cer.pem config/$root_config "v3_intermediate_ca" 3650
+    sign $intermediate_dir/csr/$(echo $intermediate_basename)_public.csr.pem $intermediate_dir/certs/ $(echo $intermediate_basename)_public.cer.pem config/$root_config "v3_intermediate_ca" $intermediate_ca_validity
     create_chain "$intermediate_dir/certs/chain.cer.pem" "$intermediate_dir/certs/$(echo $intermediate_basename)_public.cer.pem" "$root_dir/certs/$(echo $root_basename)_public.cer.pem"
 elif [[ "$option" == "prepare" ]];
 then
@@ -161,23 +182,29 @@ then
     untar        
 elif [[ "$option" == "server" ]];
 then
+    
+    check_config
+    
     echo "Creating key and CSR for a thirh party"
     index=$RANDOM
     echo "Creating key"
-    create_key $third_party_dir $index 2048
+    create_key $third_party_dir $index $others_keysize
     echo "Creating CSR file"    
     create_csr $third_party_dir $index config/$intermediate_config
     echo "Creating certificate"    
-    sign $third_party_dir/csr/$(echo $index)_public.csr.pem $third_party_dir/certs/ $(echo $index)_public.cer.pem config/$intermediate_config "server_cert" 365
+    sign $third_party_dir/csr/$(echo $index)_public.csr.pem $third_party_dir/certs/ $(echo $index)_public.cer.pem config/$intermediate_config "server_cert" $others_validity
     echo "Creating chained certificate"    
     create_chain $third_party_dir/certs/$(echo $index)_chain.pem $third_party_dir/certs/$(echo $index)_public.cer.pem $intermediate_dir/certs/chain.cer.pem
     echo "Generated ID $index"
 elif [[ "$option" == "client" ]];     
 then
+    
+    check_config
+
     echo "Creating key and CSR for a thirh party"
     index=$RANDOM
     echo "Creating key"
-    create_key $third_party_dir $index 2048
+    create_key $third_party_dir $index $others_keysize
     echo "Creating CSR file"    
     create_csr $third_party_dir $index config/$intermediate_config
     echo "Creating certificate"    
@@ -187,6 +214,9 @@ then
     echo "Generated ID $index"
 elif [[ "$option" == "sign" ]];
 then
+    
+    check_config
+    
     if [[ "$3" == "server" ]];
     then
 	permission="server_cert"
@@ -198,7 +228,7 @@ then
     fi
     	 
     echo "Signing certificate"
-    sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config $permission 365
+    sign $2 $third_party_dir/certs/ $(echo $2)_signed.cer.pem config/$intermediate_config $permission $others_validity
     
 elif [[ "$option" == "export" ]];
 then
